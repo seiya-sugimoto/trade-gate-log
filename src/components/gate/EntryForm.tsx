@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
-import { db } from '@/lib/db';
+import { repo } from '@/lib/tradesRepo';
 import { checkHardStops } from '@/lib/gate-logic';
 import { TradeEntry, TradeEntrySchema } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
@@ -37,11 +37,12 @@ export function EntryForm() {
         forbiddenTags: [],
         entryReasonOneLine: '',
         stopReason: '',
+        schemaVersion: 1,
     });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const warnings = useMemo(() => checkHardStops(formData), [formData]);
+    const warnings = useMemo(() => checkHardStops(formData as TradeEntry), [formData]);
 
     const handleInputChange = (field: string, value: any) => {
         if (field.includes('.')) {
@@ -70,7 +71,8 @@ export function EntryForm() {
                 id: uuidv4(),
                 createdAt: new Date(),
                 gateInternal: { warnings, gateScore: 0 },
-                postTrade: { result: 'NONE', followedRules: 'NONE', deviationTags: [], learnOneLine: '' }
+                postTrade: { result: 'NONE', followedRules: 'NONE', deviationTags: [], learnOneLine: '' },
+                schemaVersion: 1
             };
 
             // Validation
@@ -89,7 +91,7 @@ export function EntryForm() {
                 return;
             }
 
-            await db.trades.add(fullData as TradeEntry);
+            await repo.saveTrade(fullData as TradeEntry);
             router.push('/log');
         } catch (error) {
             console.error('Failed to save trade:', error);

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
+import { repo } from '@/lib/tradesRepo';
 import { TradeEntry } from '@/lib/schemas';
 import { format } from 'date-fns';
 import {
@@ -47,12 +47,12 @@ import { cn } from '@/lib/utils';
 import { json2csv } from 'json-2-csv';
 
 export function TradeTable() {
-    const trades = useLiveQuery(() => db.trades.reverse().toArray()) || [];
+    const trades = useLiveQuery(() => repo.getAllTrades()) || [];
     const [filter, setFilter] = useState({ symbol: '', result: 'ALL' });
     const [editingTrade, setEditingTrade] = useState<TradeEntry | null>(null);
 
     const filteredTrades = useMemo(() => {
-        return trades.filter(t => {
+        return trades.filter((t: TradeEntry) => {
             const matchSymbol = t.symbol.toLowerCase().includes(filter.symbol.toLowerCase());
             const matchResult = filter.result === 'ALL' || t.postTrade?.result === filter.result;
             return matchSymbol && matchResult;
@@ -71,7 +71,7 @@ export function TradeTable() {
     const handleExportMarkdown = () => {
         let md = `# Trade Log Export - ${format(new Date(), 'yyyy/MM/dd HH:mm')}\n\n`;
 
-        filteredTrades.forEach((t, i) => {
+        filteredTrades.forEach((t: TradeEntry, i: number) => {
             md += `## ${i + 1}. ${t.symbol} (${t.side}) - ${format(t.createdAt, 'yyyy/MM/dd HH:mm')}\n`;
             md += `- **Result**: ${t.postTrade?.result || 'PENDING'}\n`;
             md += `- **Entry Type**: ${t.entryType}\n`;
@@ -96,7 +96,7 @@ export function TradeTable() {
 
     const updateResult = async () => {
         if (!editingTrade) return;
-        await db.trades.update(editingTrade.id, { postTrade: editingTrade.postTrade });
+        await repo.updateTrade(editingTrade.id, { postTrade: editingTrade.postTrade });
         setEditingTrade(null);
     };
 

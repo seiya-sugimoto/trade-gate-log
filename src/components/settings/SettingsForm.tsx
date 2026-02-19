@@ -1,7 +1,10 @@
 "use client";
 
 import { useUIStore } from '@/lib/store';
-import { db } from '@/lib/db';
+import { repo } from '@/lib/tradesRepo';
+import { format } from 'date-fns';
+import { json2csv } from 'json-2-csv';
+import { TradeEntry } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,15 +21,49 @@ export function SettingsForm() {
         alert('API Key saved locally.');
     };
 
-    const handleExportData = async () => {
-        const trades = await db.trades.toArray();
-        const data = JSON.stringify({ trades, settings: { isPro } }, null, 2);
+    const handleExportJSON = async () => {
+        const trades = await repo.getAllTrades();
+        const settings = await repo.getSettings();
+        const data = JSON.stringify({ trades, settings, exportedAt: new Date().toISOString() }, null, 2);
         const blob = new Blob([data], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `trade_gate_backup_${new Date().toISOString().split('T')[0]}.json`;
+        link.download = `trade-gate-backup_${format(new Date(), 'yyyy-MM-dd')}.json`;
         link.click();
+
+        await repo.saveSettings({ lastExportedAt: new Date().toISOString() });
+    };
+
+    const handleExportCSV = async () => {
+        const trades = await repo.getAllTrades();
+
+        // Flatten trades for CSV
+        const flattened = trades.map(t => ({
+            id: t.id,
+            date: format(t.createdAt, 'yyyy-MM-dd HH:mm'),
+            symbol: t.symbol,
+            side: t.side,
+            entryType: t.entryType,
+            reasons: t.reasons.join(';'),
+            stopReason: t.stopReason,
+            entryReason: t.entryReasonOneLine,
+            rr: t.rrCategory,
+            warnings: t.gateInternal.warnings.join(';'),
+            frictionNote: t.frictionNote || '',
+            result: t.postTrade?.result || 'PENDING',
+            followedRules: t.postTrade?.followedRules || '',
+            learnings: t.postTrade?.learnOneLine || ''
+        }));
+
+        const csv = json2csv(flattened);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `trade-log_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+        link.click();
+
+        await repo.saveSettings({ lastExportedAt: new Date().toISOString() });
     };
 
     const handleImportData = () => {
@@ -39,14 +76,22 @@ export function SettingsForm() {
             reader.onload = async (re: any) => {
                 try {
                     const data = JSON.parse(re.target.result);
-                    if (data.trades) {
-                        await db.trades.clear();
-                        await db.trades.bulkAdd(data.trades.map((t: any) => ({ ...t, createdAt: new Date(t.createdAt) })));
-                        alert('Data imported successfully.');
-                        window.location.reload();
+                    if (data.trades && Array.isArray(data.trades)) {
+                        if (confirm('既存のデータはすべて上書きされます。よろしいですか？')) {
+                            // Ensure dates are parsed
+                            const sanitizedTrades = data.trades.map((t: any) => ({
+                                ...t,
+                                createdAt: new Date(t.createdAt)
+                            }));
+                            await repo.importData({ trades: sanitizedTrades, settings: data.settings });
+                            alert('Data imported successfully.');
+                            window.location.reload();
+                        }
+                    } else {
+                        alert('Invalid backup file format.');
                     }
                 } catch (err) {
-                    alert('Failed to import data.');
+                    alert('Failed to import data: ' + (err as Error).message);
                 }
             };
             reader.readAsText(file);
@@ -56,7 +101,7 @@ export function SettingsForm() {
 
     const clearAllData = async () => {
         if (confirm('全てのデータを削除しますか？この操作は取り消せません。')) {
-            await db.trades.clear();
+            await repo.clearAllData();
             window.location.reload();
         }
     };
@@ -106,14 +151,17 @@ export function SettingsForm() {
                     <CardDescription>すべてのデータはブラウザの IndexedDB に保存されています。</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-4">
-                    <Button variant="outline" className="gap-2" onClick={handleExportData}>
+                    <Button variant="outline" className="gap-2" onClick={handleExportCSV}>
+                        <Download className="w-4 h-4" /> CSV エクスポート
+                    </Button>
+                    <Button variant="outline" className="gap-2" onClick={handleExportJSON}>
                         <Download className="w-4 h-4" /> JSON バックアップ
                     </Button>
                     <Button variant="outline" className="gap-2" onClick={handleImportData}>
                         <Upload className="w-4 h-4" /> データを復元
                     </Button>
                     <Button variant="destructive" className="gap-2" onClick={clearAllData}>
-                        <Trash2 className="w-4 h-4" /> 全削除
+                        <Trash2 className="w-4 h-4" /> 全データ削除
                     </Button>
                 </CardContent>
             </Card>

@@ -34,7 +34,8 @@ export function SeedButton() {
                     followedRules: 'YES',
                     deviationTags: [],
                     learnOneLine: 'セオリー通りの良いトレード。'
-                }
+                },
+                schemaVersion: 1
             },
             {
                 id: uuidv4(),
@@ -69,7 +70,8 @@ export function SeedButton() {
                     followedRules: 'NO',
                     deviationTags: [],
                     learnOneLine: '警告を無視した結果。団子でのエントリーはやめる。'
-                }
+                },
+                schemaVersion: 1
             }
         ];
 

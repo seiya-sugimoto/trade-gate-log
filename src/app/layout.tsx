@@ -1,4 +1,5 @@
 import { Sidebar } from '@/components/layout/Sidebar';
+import { ExportReminder } from '@/components/layout/ExportReminder';
 import { Noto_Sans_JP } from 'next/font/google';
 import './globals.css';
 
@@ -26,6 +27,7 @@ export default function RootLayout({
             {children}
           </main>
         </div>
+        <ExportReminder />
       </body>
     </html>
   );

@@ -36,6 +36,7 @@ export const TradeEntrySchema = z.object({
     deviationTags: z.array(z.string()).default([]),
     learnOneLine: z.string().default(''),
   }).optional(),
+  schemaVersion: z.number().default(1),
 });
 
 export type TradeEntry = z.infer<typeof TradeEntrySchema>;
@@ -43,7 +44,11 @@ export type TradeEntry = z.infer<typeof TradeEntrySchema>;
 export const SettingsSchema = z.object({
   geminiApiKey: z.string().optional(),
   isPro: z.boolean().default(false),
-  theme: z.enum(['light', 'dark']).default('dark'),
+  theme: z.enum(['light', 'dark']).default('light'),
+  lastExportedAt: z.string().optional(), // ISO String
+  reminderEnabled: z.boolean().default(true),
+  schemaVersion: z.number().default(1),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
+export type AppSettings = Settings; // Alias for repository
